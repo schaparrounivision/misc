@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BRAZE - ENGAGEMENT - ERD </title>
+    <script src="https://cdn.jsdelivr.net/npm/gojs/release/go.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/create-gojs-kit@3.0.20/dist/extensions/ScrollingTable.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/create-gojs-kit@3.0.20/dist/extensions/HyperlinkText.js"></script>
+    <style type="text/css">
+      #infoBoxHolder {
+        z-index: 300;
+        position: absolute;
+        left: 1px;
+      }
+    
+      #infoBox {
+        border: 1px solid #999;
+        padding: 8px;
+        background-color: whitesmoke;
+        opacity: 0.9;
+        position: relative;
+        width: 170px;
+        font-family: arial, helvetica, sans-serif;
+        font-weight: bold;
+        font-size: 11px;
+      }
+    
+      /* this is known as the "clearfix" hack to allow
+         floated objects to add to the height of a div */
+      #infoBox:after, #controls::after {
+        visibility: hidden;
+        display: block;
+        font-size: 0;
+        content: ' ';
+        clear: both;
+        height: 0;
+      }
+    
+      div.infoTitle {
+        width: 100px;
+        font-weight: normal;
+        color: #787878;
+        float: left;
+        margin-left: 4px;
+      }
+    
+      div.infoValues {
+        width: 30px;
+        text-align: right;
+        float: right;
+      }
+    
+      label:hover,
+      label:focus {
+        background: #cedff2;
+      }
+    </style>
+</head>
+<body>
+    <div id="myDiagramDiv"
+    style="width:90vw; height:80vh; background-color: #DAE4E4;"></div>    
+    <div id="infoBoxHolder">
+      <!-- Initially Empty, it is populated when updateInfoBox is called -->
+    </div>
+
+    <script>
+
+
+        function  generate_items_panel(panel_name, panel_title, items_name, visible = true, scrollable = false){
+          const items_panel = new go.Panel('TableRow', {
+            background: 'transparent',
+            defaultStretch: go.Stretch.Horizontal,
+            stretch: go.Stretch.Horizontal,
+            // each row is a port
+            //fromSpot: go.Spot.LeftRightSides, toSpot: go.Spot.LeftRightSides,
+            //fromLinkable: true, 
+            //toLinkable: true,
+          })
+          .bind('portId', 'name')  // each row is a port
+          .add( // add whatever you want as columns in the scrolled "Table" Panel
+            new go.TextBlock({
+            margin: new go.Margin(0, 5),
+            column: 1,
+            font: 'bold 10px sans-serif',
+            //alignment: go.Spot.Left,
+            // and disallow drawing links from or to this text:
+            wrap: go.Wrap.None,
+            fromLinkable: false,
+            toLinkable: false
+          }).bind('text', 'key'),
+          new go.TextBlock({
+            margin: new go.Margin(0, 5),
+            column: 2,
+            font: 'bold 10px sans-serif',
+            //alignment: go.Spot.Left,
+            // and disallow drawing links from or to this text:
+            wrap: go.Wrap.None,
+            fromLinkable: false,
+            toLinkable: false
+          }).bind('text', 'name'),
+          new go.TextBlock({
+            margin: new go.Margin(0, 5),
+            column: 3,
+            font: '10px sans-serif',
+            wrap: go.Wrap.None,
+            //alignment: go.Spot.Left
+          }).bind('text', 'value')                  
+          );
+
+          const table_panel = new go.Panel("Table", { 
+            background: '#EEEEEE',
+            name : panel_name, 
+            defaultStretch: go.Stretch.Horizontal,
+            stretch: go.GraphObject.Horizontal, 
+            visible : visible,
+            //stretch: go.Stretch.Fill,
+            itemTemplate: items_panel,
+            defaultColumnSeparatorStroke: 'gray',
+            defaultColumnSeparatorStrokeWidth: 0.5,
+            defaultRowSeparatorStroke: 'gray',
+            defaultRowSeparatorStrokeWidth: 0.5,
+            defaultSeparatorPadding: new go.Margin(1, 3, 0, 3),
+            rowSizing: go.Sizing.None
+          })
+          .bind('itemArray', items_name);
+
+          const scrollable_panel = new go.Panel('Auto', {'name' : panel_name, stretch: go.GraphObject.Horizontal, visible : visible})
+          .add(
+            new go.Shape({ fill: '#EEEEEE' }),
+            go.GraphObject.build('ScrollingTable', {
+                name: 'SCROLLER',
+                stretch: go.GraphObject.Horizontal,
+                desiredSize: new go.Size(NaN, 60), // fixed height, but is resizable
+                defaultColumnSeparatorStroke: 'gray',
+                defaultColumnSeparatorStrokeWidth: 0.5,
+                'TABLE.itemTemplate': items_panel,
+                // style some of the properties of the "Table" Panel
+                'TABLE.defaultColumnSeparatorStroke': 'gray',
+                'TABLE.defaultColumnSeparatorStrokeWidth': 0.5,
+                'TABLE.defaultRowSeparatorStroke': 'gray',
+                'TABLE.defaultRowSeparatorStrokeWidth': 0.5,
+                'TABLE.defaultSeparatorPadding': new go.Margin(1, 3, 0, 3),
+                'TABLE.rowSizing': go.Sizing.None
+              })
+              .bindTwoWay('desiredSize', 'size', go.Size.parse, go.Size.stringify)
+          )
+          .bind('TABLE.itemArray', items_name)
+          // This swaps the columns of the scrollbar and table.
+          // If you look at the ScrollingTable extension source, the scrolling table itself
+          // is implemented as a table with the scrollbar column 1 and the table content in column 0.
+          // This simply switches them to make the scrollbar appear on the left.
+          .bind('TABLE.column', 'left', left => left ? 2 : 0)
+          ;
+          
+
+          return new go.Panel(go.Panel.Vertical, {stretch: go.GraphObject.Horizontal, background: "lightgray" })
+            .add(
+              new go.Panel(go.Panel.Horizontal, {stretch: go.GraphObject.Horizontal, background: "lightgray" })
+              .add(
+                new go.TextBlock({
+                  text: panel_title,
+                  alignment: go.Spot.Center,
+                  margin: 3,
+                  stroke: 'black',
+                  textAlign: 'center',
+                  font: 'bold 8pt sans-serif'
+                }),
+                go.GraphObject.build("PanelExpanderButton", {}, panel_name),
+              ),
+              scrollable ? scrollable_panel : table_panel
+            );
+        }
+
+        function view_selected_nodes(diagram, data, node_keys){
+          let show_keys = new Set([...node_keys]);
+          let groups = data.nodes.filter(x => node_keys.has(x.key) && !!x.group).map(x => x.group);
+          groups.forEach(x => {
+            show_keys.add(x);              
+          });
+          data.nodes.forEach(
+            x => {
+              if(!show_keys.has(x.key)) diagram.findNodeForKey(x.key).visible = false;
+              else diagram.findNodeForKey(x.key).visible = true;
+            }
+          );
+        }
+
+        function showToolTip(obj, diagram) {
+          if (obj !== null) {
+            var node = obj.part;
+            var e = diagram.lastInput;
+            // var shape = node.findObject('SHAPE');
+            // shape.stroke = 'white';
+            //if (lastStroked !== null && lastStroked !== shape)
+            //  lastStroked.stroke = null;
+            //lastStroked = shape;
+            updateInfoBox(e.viewPoint, node.data);
+          } else {
+            //if (lastStroked !== null) lastStroked.stroke = null;
+            //lastStroked = null;
+            document.getElementById('infoBoxHolder').innerHTML = '';
+          }
+        }  
+        
+        function doMouseOver(e) {
+      if (performance.now() - e.timestamp > 200) return; // ignore old events
+      if (e === undefined) e = diagram.lastInput;
+      var doc = e.documentPoint;
+      // find all Nodes that are within 100 units
+      var list = diagram.findObjectsNear(
+        doc,
+        10,
+        null,
+        (x) => x instanceof go.Node
+      );
+      // now find the one that is closest to e.documentPoint
+      var closest = null;
+      var closestDist = 999999999;
+      list.each((node) => {
+        var dist = doc.distanceSquaredPoint(
+          node.getDocumentPoint(go.Spot.Center)
+        );
+        if (dist < closestDist) {
+          closestDist = dist;
+          closest = node;
+        }
+      });
+      //showToolTip(closest, diagram);
+    }        
+
+  // This function is called to update the tooltip information
+  // depending on the bound data of the Node that is closest to the pointer.
+  function updateInfoBox(mousePt, data) {
+    var box = document.getElementById('infoBoxHolder');
+    box.innerHTML = '';
+    var infobox = document.createElement('div');
+    infobox.id = 'infoBox';
+    box.appendChild(infobox);
+    for (var i = 0; i < 9; i++) {
+      var child = document.createElement('div');
+      switch (i) {
+        case 0:
+          child.textContent = data.species;
+          break;
+        case 1:
+          child.className = 'infoTitle';
+          child.textContent = data.description;
+          break;
+        case 2:
+          child.className = 'infoValues';
+          child.textContent = data.sepalLength;
+          break;
+        case 3:
+          child.className = 'infoTitle';
+          child.textContent = 'TODO: ADD INFO';
+          break;
+        case 4:
+          child.className = 'infoValues';
+          child.textContent = data.sepalWidth;
+          break;
+        case 5:
+          child.className = 'infoTitle';
+          child.textContent = 'TODO: ADD INFO';
+          break;
+        case 6:
+          child.className = 'infoValues';
+          child.textContent = data.petalLength;
+          break;
+        case 7:
+          child.className = 'infoTitle';
+          child.textContent = 'TODO: ADD INFO';
+          break;
+        case 8:
+          child.className = 'infoValues';
+          child.textContent = data.petalWidth;
+          break;
+      }
+      infobox.appendChild(child);
+    }
+    box.style.left = mousePt.x + 30 + 'px';
+    box.style.top = mousePt.y + 20 + 'px';
+  }
+
+    // Make sure the infoBox is momentarily hidden if the user tries to mouse over it
+    var infoBoxH = document.getElementById('infoBoxHolder');
+    infoBoxH.addEventListener(
+      'mousemove',
+      () => {
+        var box = document.getElementById('infoBoxHolder');
+        box.style.left = parseInt(box.style.left) + 'px';
+        box.style.top = parseInt(box.style.top) + 30 + 'px';
+      },
+      false
+    );
+
+    const myToolTip = new go.HTMLInfo({
+      show: showToolTip
+    });        
+
+    var diagramDiv = document.getElementById('myDiagramDiv');
+    // Make sure the infoBox is hidden when the mouse is not over the Diagram
+    diagramDiv.addEventListener(
+      'mouseout',
+      (e) => {
+        if (lastStroked !== null) lastStroked.stroke = null;
+        lastStroked = null;
+
+        var infoBox = document.getElementById('infoBox');
+        var elem = document.elementFromPoint(e.clientX, e.clientY);
+        if (
+          elem !== null &&
+          (elem === infoBox || elem.parentNode === infoBox)
+        ) {
+          var box = document.getElementById('infoBoxHolder');
+          box.style.left = parseInt(box.style.left) + 'px';
+          box.style.top = parseInt(box.style.top) + 30 + 'px';
+        } else {
+          var box = document.getElementById('infoBoxHolder');
+          box.innerHTML = '';
+        }
+      },
+      false
+    );
+
+    var lastStroked = null; // this remembers the last highlight Shape
+
+    var diagram =
+    new go.Diagram("myDiagramDiv",
+    { // enable Ctrl-Z to undo and Ctrl-Y to redo
+      "undoManager.isEnabled": true,
+      "toolManager.toolTipDuration": 10000,
+      layout: new go.LayeredDigraphLayout({
+        aggressiveOption: go.LayeredDigraphAggressive.More,
+
+      }),
+      LayoutCompleted: (e) => {
+        // update all of the scrollbars
+        e.diagram.nodes.each((n) => {
+          var table = n.findObject('TABLE');
+          if (table !== null && table.panel._updateScrollBar) table.panel._updateScrollBar(table);
+        });
+      },
+      'toolManager.hoverDelay': 10, // how quickly tooltips are shown
+      // isReadOnly: true, // don't let users modify anything
+      // mouseOver: doMouseOver, // this event handler is defined below
+      // click: doMouseOver // this event handler is defined below
+    });
+
+
+
+
+    diagram.groupTemplate =
+    new go.Group("Auto", {
+      // declare the Group.layout:
+      
+      layout: new go.LayeredDigraphLayout({
+        aggressiveOption: go.LayeredDigraphAggressive.More,
+      })
+    })
+    .add(
+      new go.Shape("RoundedRectangle", {  // surrounds everything
+          parameter1: 10, fill: "rgba(128,128,128,0.33)"
+        }),
+      new go.Panel("Vertical",  // position header above the subgraph
+            { 
+              defaultAlignment: go.Spot.Left,
+              stretch: go.Stretch.Horizontal,
+            },
+          )
+        .add(
+          new go.Panel("Horizontal",  // the header
+              { defaultAlignment: go.Spot.Top, stretch: go.Stretch.Horizontal })
+            .add(
+              // the button for the user to expand/collapse the group
+              go.GraphObject.make("SubGraphExpanderButton"),
+              // group title near top, next to button
+              new go.TextBlock({ font: "Bold 12pt Sans-Serif" })
+                .bind("text")
+            ),
+          new go.Panel("Vertical",  // the header
+            { defaultAlignment: go.Spot.Left, stretch: go.Stretch.Horizontal, padding: new go.Margin(10, 0) }
+          ).add(
+            generate_items_panel("id_fields", "id_fields", "id_fields", true, false),
+          ),
+          // represents area for all member parts
+          new go.Placeholder({ padding: new go.Margin(10, 0), background: "white" })
+
+        )
+    )
+    .bind("isSubGraphExpanded","isSubGraphExpanded")
+    .bind("opacity","opacity");
+
+    diagram.nodeTemplate =
+    new go.Node('Vertical', {
+      selectionObjectName: 'SCROLLER',
+      resizable: true, 
+      resizeObjectName: 'SCROLLER',
+      portSpreading: go.PortSpreading.None,
+      click: (e, obj) => console.log("Clicked on " + obj.data.description),
+      // toolTip:  // define a tooltip for each node that displays the color as text
+      //   go.GraphObject.build("ToolTip")
+      //     .add(
+      //       new go.TextBlock({ margin: 4 })
+      //         .bind("text", "description")
+      //     )  // end of Adornment
+    })
+    .bind('visible', 'visible')
+    .bindTwoWay('location', 'loc', go.Point.parse, go.Point.stringify)
+    .add(
+      new go.Panel('Auto', { stretch: go.Stretch.Horizontal }) // as wide as the whole node
+        .add(
+          new go.Shape({ fill: '#1570A6', stroke: null }),
+            go.GraphObject.build('HyperlinkText',
+            { 
+              alignment: go.Spot.Center,
+              margin: 3,
+              stroke: 'white',
+              textAlign: 'center',
+              font: 'bold 8pt sans-serif'
+            },
+            (node) => node.data?.url,
+            (node) => node.data.key
+          ),          
+        ),
+        generate_items_panel("info", "info", "info", false, false),
+        generate_items_panel("id_fields", "id_fields", "id_fields", true, true),
+        generate_items_panel("fields", "fields", "fields", false, true)
+    );
+
+    diagram.linkTemplate =
+    new go.Link({ 
+        //routing: go.Routing.Orthogonal,
+          //  routing: go.Link.AvoidsNodes, 
+        selectionAdorned: true,
+        //layerName: 'Background',
+        reshapable: true,
+        routing: go.Routing.AvoidsNodes,
+        corner: 3,
+        curve: go.Curve.JumpOver        
+    })  // link route should avoid nodes
+    .add(
+      new go.Shape({ // the link shape
+        stroke: '#black',
+        strokeWidth: 2
+      }).bind("stroke", "color"),
+      new go.TextBlock({ // the "from" label
+        textAlign: 'center',
+        font: 'bold 12px sans-serif',
+        stroke: 'black',
+        segmentIndex: 0,
+        segmentOffset: new go.Point(NaN, NaN),
+        segmentOrientation: go.Orientation.Upright
+      })
+      .bind('text','fromText'),
+      new go.TextBlock({ // the "to" label
+        textAlign: 'center',
+        font: 'bold 14px sans-serif',
+        stroke: 'black',
+        segmentIndex: -1,
+        segmentOffset: new go.Point(NaN, NaN),
+        segmentOrientation: go.Orientation.Upright
+      })
+      .bind('text', 'toText')
+    );
+
+    
+    diagram.model = new go.GraphLinksModel({
+      linkFromPortIdProperty: 'fromPort',
+      linkToPortIdProperty: 'toPort',
+      nodeDataArray: [
+        {
+          key: 'tf_braze_push_logs_daily',
+          location: new go.Point(-350,0),
+          isGroup : false, group : "email_events",
+          description: `
+            TO DO...
+          `,
+          info : [
+          ],      
+          id_fields: [
+            {"key": "PK", "name" : "braze_logs_uid_hashed", "value" : "int"},
+            {"name" : "event_date", "value" : "date"},
+            {"name" : "campaign_id", "value" : "string"},
+            {"name" : "campaign_name", "value" : "string" },
+            {"name" : "message_variation_id", "value" : "string"},
+            {"name" : "message_variation_name", "value" : "string"},
+            {"name" : "canvas_id", "value" : "string"},
+            {"name" : "canvas_name", "value" : "string"},
+            {"name" : "canvas_variation_id", "value" : "string"},
+            {"name" : "canvas_variation_name", "value" : "string"},
+            {"name" : "canvas_step_id", "value" : "string"},
+            {"name" : "canvas_step_name", "value" : "string"},
+            {"name" : "profile_id", "value" : "string"},
+            {"name" : "braze_user_id", "value" : "string"},
+          ],
+          fields: [
+            {"name" : "cnt_push_bounces", value : "int" },
+            {"name" : "cnt_push_opens", value : "int" },
+            {"name" : "cnt_push_unique_opens", value : "int" },
+            {"name" : "push_opens", value : "array" },
+            {"name" : "cnt_push_sends", value : "int" },
+            {"name" : "cnt_push_unique_sends", value : "int" },
+            ]
+        },
+        {
+          key: 'tf_braze_email_logs_daily',
+          location: new go.Point(-350,0),
+          isGroup : false, group : "email_events",
+          description: `
+            TO DO...
+          `,
+          info : [
+          ],      
+          id_fields: [
+            {"key": "PK", "name" : "braze_logs_uid_hashed", "value" : "int"},
+            {"name" : "event_date", "value" : "date"},
+            {"name" : "campaign_id", "value" : "string"},
+            {"name" : "campaign_name", "value" : "string" },
+            {"name" : "message_variation_id", "value" : "string"},
+            {"name" : "message_variation_name", "value" : "string"},
+            {"name" : "canvas_id", "value" : "string"},
+            {"name" : "canvas_name", "value" : "string"},
+            {"name" : "canvas_variation_id", "value" : "string"},
+            {"name" : "canvas_variation_name", "value" : "string"},
+            {"name" : "canvas_step_id", "value" : "string"},
+            {"name" : "canvas_step_name", "value" : "string"},
+            {"name" : "profile_id", "value" : "string"},
+            {"name" : "braze_user_id", "value" : "string"},
+          ],
+          fields: [
+            {"name": "cnt_email_bounces", "value" : "int"},
+            {"name": "cnt_email_clicks", "value" : "int"},
+            {"name": "cnt_email_unique_clicks", "value" : "int"},
+            {"name": "cnt_email_amp_clicks", "value" : "int"},
+            {"name": "email_clicks", "value" : "array"},
+            {"name": "cnt_email_deliveries", "value" : "int"},
+            {"name": "cnt_email_markspam", "value" : "int"},
+            {"name": "cnt_email_opens", "value" : "int"},
+            {"name": "cnt_email_unique_opens", "value" : "int"},
+            {"name": "cnt_email_machine_opens", "value" : "int"},
+            {"name": "cnt_email_amp_opens", "value" : "int"},
+            {"name": "cnt_email_sends", "value" : "int"},
+            {"name": "cnt_email_unique_sends", "value" : "int"},
+            {"name": "cnt_email_soft_bounces", "value" : "int"},
+            {"name": "cnt_email_unsubscribes", "value" : "int"},
+          ]
+        },
+        {
+          key: 'tf_braze_conversion_logs_daily',
+          location: new go.Point(-350,0),
+          isGroup : false, group : "email_events",
+          description: `
+            TO DO...
+          `,
+          info : [
+          ],      
+          id_fields: [
+            {"key": "PK", "name" : "braze_logs_uid_hashed", "value" : "int"},
+            {"name" : "event_date", "value" : "date"},
+            {"name" : "campaign_id", "value" : "string"},
+            {"name" : "campaign_name", "value" : "string" },
+            {"name" : "message_variation_id", "value" : "string"},
+            {"name" : "message_variation_name", "value" : "string"},
+            {"name" : "canvas_id", "value" : "string"},
+            {"name" : "canvas_name", "value" : "string"},
+            {"name" : "canvas_variation_id", "value" : "string"},
+            {"name" : "canvas_variation_name", "value" : "string"},
+            {"name" : "canvas_step_id", "value" : "string"},
+            {"name" : "canvas_step_name", "value" : "string"},
+            {"name" : "profile_id", "value" : "string"},
+            {"name" : "braze_user_id", "value" : "string"},
+          ],
+          fields: [
+            {"name" : "conversions", "value" : "array"},
+            {"name" : "cnt_conversions_1", "value" : "int"},
+            {"name" : "cnt_conversions_2", "value" : "int"},
+            {"name" : "cnt_conversions_3", "value" : "int"},
+            {"name" : "cnt_conversions_4", "value" : "int"}
+          ]
+        },
+        {
+          key: 'tf_braze_entry_logs',
+          location: new go.Point(-350,0),
+          isGroup : false, group : "email_events",
+          description: `
+            TO DO...
+          `,
+          info : [
+          ],      
+          id_fields: [
+            {"key": "PK", "name" : "braze_logs_uid_hashed", "value" : "int"},
+            {"name" : "event_date", "value" : "date"},
+            {"name" : "campaign_id", "value" : "string"},
+            {"name" : "campaign_name", "value" : "string" },
+            {"name" : "message_variation_id", "value" : "string"},
+            {"name" : "message_variation_name", "value" : "string"},
+            {"name" : "canvas_id", "value" : "string"},
+            {"name" : "canvas_name", "value" : "string"},
+            {"name" : "canvas_variation_id", "value" : "string"},
+            {"name" : "canvas_variation_name", "value" : "string"},
+            {"name" : "canvas_step_id", "value" : "string"},
+            {"name" : "canvas_step_name", "value" : "string"},
+            {"name" : "profile_id", "value" : "string"},
+            {"name" : "braze_user_id", "value" : "string"},
+          ],
+          fields: [
+            {"name" : "cnt_entries", "value" : "int"},
+            {"name" : "cnt_control_group_entries", "value" : "int"},
+          ]
+        },        
+        {
+          key: 'tf_braze_inapp_logs_daily',
+          location: new go.Point(-350,0),
+          isGroup : false, group : "email_events",
+          description: `
+            TO DO...
+          `,
+          info : [
+          ],      
+          id_fields: [
+            {"key": "PK", "name" : "braze_logs_uid_hashed", "value" : "int"},
+            {"name" : "event_date", "value" : "date"},
+            {"name" : "campaign_id", "value" : "string"},
+            {"name" : "campaign_name", "value" : "string" },
+            {"name" : "message_variation_id", "value" : "string"},
+            {"name" : "message_variation_name", "value" : "string"},
+            {"name" : "canvas_id", "value" : "string"},
+            {"name" : "canvas_name", "value" : "string"},
+            {"name" : "canvas_variation_id", "value" : "string"},
+            {"name" : "canvas_variation_name", "value" : "string"},
+            {"name" : "canvas_step_id", "value" : "string"},
+            {"name" : "canvas_step_name", "value" : "string"},
+            {"name" : "profile_id", "value" : "string"},
+            {"name" : "braze_user_id", "value" : "string"},
+          ],
+          fields: [
+            {"name" : "cnt_inapp_clicks", "value" : "int"},
+            {"name" : "cnt_inapp_unique_clicks", "value" : "int"},
+            {"name" : "inapp_clicks", "value" : "array"},
+            {"name" : "cnt_inapp_impressions", "value" : "int"},
+            {"name" : "cnt_inapp_unique_impressions", "value" : "int"},
+          ]
+        },
+        {
+          key: 'tf_braze_logs_daily',
+          location: diagram.viewportBounds.center,
+          isGroup : false, group : "email_events",
+          description: `
+            TO DO...
+          `,
+          info : [
+          ],      
+          id_fields: [
+            {"key": "PK, FK", "name" : "braze_logs_uid_hashed", "value" : "int"},
+            {"name" : "event_date", "value" : "date"},
+            {"name" : "campaign_id", "value" : "string"},
+            {"name" : "campaign_name", "value" : "string" },
+            {"name" : "message_variation_id", "value" : "string"},
+            {"name" : "message_variation_name", "value" : "string"},
+            {"name" : "canvas_id", "value" : "string"},
+            {"name" : "canvas_name", "value" : "string"},
+            {"name" : "canvas_variation_id", "value" : "string"},
+            {"name" : "canvas_variation_name", "value" : "string"},
+            {"name" : "canvas_step_id", "value" : "string"},
+            {"name" : "canvas_step_name", "value" : "string"},
+            {"name" : "profile_id", "value" : "string"},
+            {"name" : "braze_user_id", "value" : "string"},
+          ],
+          fields: [
+            {"name" : "cnt_entries", "value" : "int"},
+            {"name" : "cnt_control_group_entries", "value" : "int"},
+            {"name" : "conversions", value : "array"},
+            {"name" : "cnt_conversions_1", value : "int"},
+            {"name" : "cnt_conversions_2", value : "int"},
+            {"name" : "cnt_conversions_3", value : "int"},
+            {"name" : "cnt_conversions_4", value : "int"},
+            {"name" : "cnt_email_clicks", value : "int"},
+            {"name" : "cnt_email_bounces", value : "int"},
+            {"name" : "cnt_email_unique_clicks", value : "int"},
+            {"name" : "cnt_email_amp_clicks", value : "int"},
+            {"name" : "email_clicks", value : "array"},
+            {"name" : "cnt_email_deliveries", value : "int"},
+            {"name" : "cnt_email_markspam", value : "int"},
+            {"name" : "cnt_email_opens", value : "int"},
+            {"name" : "cnt_email_unique_opens", value : "int"},
+            {"name" : "cnt_email_machine_opens", value : "int"},
+            {"name" : "cnt_email_amp_opens", value : "int"},
+            {"name" : "cnt_email_sends", value : "int"},
+            {"name" : "cnt_email_unique_sends", value : "int"},
+            {"name" : "cnt_email_soft_bounces", value : "int"},
+            {"name" : "cnt_email_unsubscribes", value : "int"},
+            {"name" : "cnt_inapp_clicks", value : "int"},
+            {"name" : "cnt_inapp_unique_clicks", value : "int"},
+            {"name" : "inapp_clicks", value : "array"},
+            {"name" : "cnt_inapp_impressions", value : "int"},
+            {"name" : "cnt_inapp_unique_impressions", value : "int"},
+            {"name" : "cnt_push_bounces", value : "int"},
+            {"name" : "cnt_push_opens", value : "int"},
+            {"name" : "cnt_push_unique_opens", value : "int"},
+            {"name" : "push_opens", value : "array"},
+            {"name" : "cnt_push_sends", value : "int"},
+            {"name" : "cnt_push_unique_sends", value : "int"},
+          ]
+        },
+        {
+          key: 'tf_non_anon_braze_engagement_daily',
+          location: diagram.viewportBounds.center,
+          isGroup : false, group : "email_events",
+          description: `
+            TO DO...
+          `,
+          info : [
+          ],      
+          id_fields: [
+            {"key": "FK", "name" : "braze_logs_uid_hashed", "value" : "int"},
+            {"key": "FK", "name" : "engagement_uid_hashed", "value" : "int"},
+            {"name" : "event_date", "value" : "date"},
+            {"name" : "campaign_id", "value" : "string"},
+            {"name" : "campaign_name", "value" : "string" },
+            {"name" : "message_variation_id", "value" : "string"},
+            {"name" : "message_variation_name", "value" : "string"},
+            {"name" : "canvas_id", "value" : "string"},
+            {"name" : "canvas_name", "value" : "string"},
+            {"name" : "canvas_variation_id", "value" : "string"},
+            {"name" : "canvas_variation_name", "value" : "string"},
+            {"name" : "canvas_step_id", "value" : "string"},
+            {"name" : "canvas_step_name", "value" : "string"},
+            {"name" : "profile_id", "value" : "string"},
+            {"name" : "braze_user_id", "value" : "string"},
+          ],
+          fields: [
+            {"name" : "cnt_entries", "value" : "int"},
+            {"name" : "cnt_control_group_entries", "value" : "int"},
+            {"name" : "conversions", value : "array"},
+            {"name" : "cnt_conversions_1", value : "int"},
+            {"name" : "cnt_conversions_2", value : "int"},
+            {"name" : "cnt_conversions_3", value : "int"},
+            {"name" : "cnt_conversions_4", value : "int"},
+            {"name" : "cnt_email_clicks", value : "int"},
+            {"name" : "cnt_email_bounces", value : "int"},
+            {"name" : "cnt_email_unique_clicks", value : "int"},
+            {"name" : "cnt_email_amp_clicks", value : "int"},
+            {"name" : "email_clicks", value : "array"},
+            {"name" : "cnt_email_deliveries", value : "int"},
+            {"name" : "cnt_email_markspam", value : "int"},
+            {"name" : "cnt_email_opens", value : "int"},
+            {"name" : "cnt_email_unique_opens", value : "int"},
+            {"name" : "cnt_email_machine_opens", value : "int"},
+            {"name" : "cnt_email_amp_opens", value : "int"},
+            {"name" : "cnt_email_sends", value : "int"},
+            {"name" : "cnt_email_unique_sends", value : "int"},
+            {"name" : "cnt_email_soft_bounces", value : "int"},
+            {"name" : "cnt_email_unsubscribes", value : "int"},
+            {"name" : "cnt_inapp_clicks", value : "int"},
+            {"name" : "cnt_inapp_unique_clicks", value : "int"},
+            {"name" : "inapp_clicks", value : "array"},
+            {"name" : "cnt_inapp_impressions", value : "int"},
+            {"name" : "cnt_inapp_unique_impressions", value : "int"},
+            {"name" : "cnt_push_bounces", value : "int"},
+            {"name" : "cnt_push_opens", value : "int"},
+            {"name" : "cnt_push_unique_opens", value : "int"},
+            {"name" : "push_opens", value : "array"},
+            {"name" : "cnt_push_sends", value : "int"},
+            {"name" : "cnt_push_unique_sends", value : "int"},
+            {"name" : "tsh", value : "int"},
+          ]
+        },
+        {
+          key: 'tf_non_anon_braze_engagement_daily_aggr',
+          location: diagram.viewportBounds.center,
+          isGroup : false, group : "email_events",
+          description: `
+            TO DO...
+          `,
+          info : [
+          ],      
+          id_fields: [
+            {"key": "PK", "name" : "event_date", "value" : "date"},
+            {"key": "PK", "name" : "campaign_id", "value" : "string"},
+            {"key": "PK", "name" : "campaign_name", "value" : "string" },
+            {"name" : "canvas_id", "value" : "string"},
+            {"name" : "canvas_name", "value" : "string"},
+            {"name" : "profile_id", "value" : "string"},
+            {"name" : "braze_user_id", "value" : "string"},
+          ],
+          fields: [
+            {"name" : "conversions", value : "array"},
+            {"name" : "cnt_conversions_1", value : "int"},
+            {"name" : "cnt_conversions_2", value : "int"},
+            {"name" : "cnt_conversions_3", value : "int"},
+            {"name" : "cnt_conversions_4", value : "int"},
+            {"name" : "cnt_email_clicks", value : "int"},
+            {"name" : "cnt_email_bounces", value : "int"},
+            {"name" : "cnt_email_unique_clicks", value : "int"},
+            {"name" : "cnt_email_amp_clicks", value : "int"},
+            {"name" : "email_clicks", value : "array"},
+            {"name" : "cnt_email_deliveries", value : "int"},
+            {"name" : "cnt_email_markspam", value : "int"},
+            {"name" : "cnt_email_opens", value : "int"},
+            {"name" : "cnt_email_unique_opens", value : "int"},
+            {"name" : "cnt_email_machine_opens", value : "int"},
+            {"name" : "cnt_email_amp_opens", value : "int"},
+            {"name" : "cnt_email_sends", value : "int"},
+            {"name" : "cnt_email_unique_sends", value : "int"},
+            {"name" : "cnt_email_soft_bounces", value : "int"},
+            {"name" : "cnt_email_unsubscribes", value : "int"},
+            {"name" : "cnt_inapp_clicks", value : "int"},
+            {"name" : "cnt_inapp_unique_clicks", value : "int"},
+            {"name" : "inapp_clicks", value : "array"},
+            {"name" : "cnt_inapp_impressions", value : "int"},
+            {"name" : "cnt_inapp_unique_impressions", value : "int"},
+            {"name" : "cnt_push_bounces", value : "int"},
+            {"name" : "cnt_push_opens", value : "int"},
+            {"name" : "cnt_push_unique_opens", value : "int"},
+            {"name" : "push_opens", value : "array"},
+            {"name" : "cnt_push_sends", value : "int"},
+            {"name" : "cnt_push_unique_sends", value : "int"},
+            {"name" : "tsh", value : "int"},
+          ]
+        },        
+        {
+          key: 'tf_profile_engagement_daily_aggr',
+          isGroup : false, group : "email_events",
+          description: `
+            TO DO...
+          `,
+          info : [
+          ],      
+          id_fields: [
+            {"key": "PK", "name" : "engagement_uid_hashed", "value" : "int"},
+            {"name" : "event_date" , "value" : "date"},
+            {"name" : "profile_id" , "value" : "int"},
+            {"name" : "user_type" , "value" : "string"},
+            {"name" : "subscriber_id" , "value" : "string" },
+            {"name" : "subscription_id" , "value" : "string"},
+          ],
+          fields: [
+            {"name" : "heartbeat_secs", value : "int"},
+          ]
+        },
+        {
+          key: 'tf_engagement_viewership_daily_aggr_segment_final',
+          isGroup : false, group : "email_events",
+          description: `
+            TO DO...
+          `,
+          info : [
+          ],      
+          id_fields: [
+            {"name" : "engagement_uid_hashed", "value" : "int"},
+            {"name" : "start_date" , "value" : "date"},
+            {"name" : "profile_id" , "value" : "int"},
+            {"name" : "user_type" , "value" : "string"},
+            {"name" : "subscriber_id" , "value" : "string" },
+            {"name" : "subscription_id" , "value" : "string"},
+          ],
+          fields: [
+            {"name" : "heartbeat_secs", value : "int"},
+          ]
+        },
+      ],
+      linkDataArray: [
+        {from: 'tf_braze_push_logs_daily', to: 'tf_braze_logs_daily', color : "#24702a", fromPort: "braze_logs_uid_hashed", toPort: "braze_logs_uid_hashed", fromText: "0..1", toText: "1"},
+        {from: 'tf_braze_email_logs_daily', to: 'tf_braze_logs_daily', color : "blue", fromPort: "braze_logs_uid_hashed", toPort: "braze_logs_uid_hashed", fromText: "0..1", toText: "1"},
+        {from: 'tf_braze_inapp_logs_daily', to: 'tf_braze_logs_daily', color : "#e38629", fromPort: "braze_logs_uid_hashed", toPort: "braze_logs_uid_hashed", fromText: "0..1", toText: "1"},
+        {from: 'tf_braze_conversion_logs_daily', to: 'tf_braze_logs_daily', color : "#9424a3", fromPort: "braze_logs_uid_hashed", toPort: "braze_logs_uid_hashed", fromText: "0..1", toText: "1"},
+        {from: 'tf_braze_entry_logs', to: 'tf_braze_logs_daily', color : "#1c9e9c", fromPort: "braze_logs_uid_hashed", toPort: "braze_logs_uid_hashed", fromText: "0..1", toText: "1"},
+        {from: 'tf_braze_logs_daily', to: 'tf_non_anon_braze_engagement_daily', color : "blue", fromPort: "braze_logs_uid_hashed", toPort: "braze_logs_uid_hashed", fromText: "0..1", toText: "1"},
+        {from: 'tf_non_anon_braze_engagement_daily', to: 'tf_profile_engagement_daily_aggr', color : "#24702a", fromPort: "braze_logs_uid_hashed", toPort: "braze_logs_uid_hashed", fromText: "1", toText: "0..1"},
+        {from: 'tf_profile_engagement_daily_aggr', to: 'tf_engagement_viewership_daily_aggr_segment_final', color : "#24702a", fromPort: "braze_logs_uid_hashed", toPort: "braze_logs_uid_hashed", fromText: "N", toText: "1"},
+        {from: 'tf_non_anon_braze_engagement_daily', to: 'tf_non_anon_braze_engagement_daily_aggr', color : "black", fromPort: "event_date",  fromText: "1", toText: "N"},
+
+        // { from: 'braze_logs', to: 'tf_anon_braze_engagement', color : "#24702a", },
+        // { from: 'braze_logs', to: 'tf_non_anon_braze_engagement', color : "#24702a", },
+        // { from: 'braze_vix_account_user_email_nonpii', to: 'braze_vix_account_user_merged_nonpii', color : "#24702a" },
+        // { from: 'braze_vix_account_user_noemail_nonpii', to: 'braze_vix_account_user_merged_nonpii', color : "#24702a" },
+        // { from: 'st_vix_ott_pd_data_vix_user_events_svod', to: 'tf_segment_content', },
+        // { from: 'st_vix_ott_pd_data_vix_user_events_svod', to: 'stg_braze_lookup', },
+        // { from: 'tf_segment_content', to: 'tf_braze_lookup', },
+        // { from: 'stg_braze_lookup', to: 'tf_braze_lookup', },
+        // { from: 'tf_segment_content', to: 'mart_engagement', },
+        // { from: 'known_identity_silver', to: 'tf_non_anon_braze_engagement', color : "blue", },
+        // { from: 'tf_braze_lookup', to: 'tf_anon_braze_engagement',  color : "blue", },
+        // { from: 'mart_engagement', to: 'tf_anon_braze_engagement',  color : "blue", },
+        // { from: 'mart_engagement', to: 'tf_non_anon_braze_engagement', color : "#24702a" },
+
+      ]
+    });
+
+
+
+    </script>
+</body>
+</html>
